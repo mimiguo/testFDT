@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns:s="library://ns.adobe.com/flex/spark"
+	xmlns:mx="library://ns.adobe.com/flex/mx" minWidth="955"
+	minHeight="600" applicationComplete="init()">
+	<fx:Script>
+		<![CDATA[
+			import org.osmf.events.MediaPlayerStateChangeEvent;
+			import org.osmf.events.TimeEvent;
+			import mx.core.UIComponent;
+			private var nc:NetConnection;
+			private var ns:NetStream;
+			private var cam:Camera;
+			private var mic:Microphone;
+			private var vid:Video;
+			private var vidContainer:UIComponent;
+			private var rtmpsrc_so:String	= "rtmp://fms.2be.com.tw/basicSO";
+			private var rtmpsrc:String	= "rtmp://fms.2be.com.tw/live";
+			//source="rtmp://fms.2be.com.tw/vid3/streams/recordings/test2018_1433.flv"
+			//source="rtmp://fmsexamples.adobe.com/vod/mp4:_cs4promo_1000.f4v"
+//			private var rtmpsrc:String	= "fms.2be.com.tw/vid3/streams/recordings/";
+			private const SUCCESS:String 		= "NetConnection.Connect.Success";
+			
+			private var test_so:SharedObject;
+			private var nc_testso:NetConnection;
+			private var monthday:Date;
+			private var good:Boolean;
+			public function init() : void 
+			{
+				nc = new NetConnection( );
+				nc.client = this;
+				nc.addEventListener(NetStatusEvent.NET_STATUS, connectHandler); 
+				nc.connect(rtmpsrc);
+				
+				mic = Microphone.getMicrophone();
+				vid = new Video();
+				vidContainer = new UIComponent();
+				vidContainer.addChild(vid);
+				vidContainer.x=400;
+				vidContainer.y=130;
+				addElement(vidContainer);
+//				player.startDrag();
+			}
+			private function connectHandler(e:NetStatusEvent):void 
+			{
+				trace(e.info.code);
+				if (e.info.code == SUCCESS) {
+					ns = new NetStream(nc);
+					ns.client = this;
+					ns.addEventListener(NetStatusEvent.NET_STATUS, streamHandler);
+				}
+				test_txt.text = e.info.code;
+			}
+			private function close():void
+			{
+				try{	
+//					record_btn.label='record';
+					ns.close();
+					nc.close();
+					
+					vid.clear();
+					vid.attachCamera(null);
+					this.removeElement(vidContainer);
+				} catch(e:Error) {
+					trace(e.message);					
+				}
+			}
+			public function onBWDone(...rest):void
+			{
+				trace('onBWDone();'+ rest, rest.length);
+				for (var i:int=0; i<rest.length; ++i) {
+					trace("\t"+i+":"+rest[i]);
+				}
+			}
+			public function onMetaData(info:Object):void
+			{
+				trace('onMetaData');
+				for( var p:String in info)
+				{
+					trace(p, info[p]);
+				}
+			}
+			public function onPlayStatus(info:Object):void
+			{
+				trace('onPlayStatus');
+				for( var p:String in info)
+				{
+					trace('*', p, info[p]);
+				}
+			}
+			private function record():void
+			{
+				if (ns) {
+					cam = Camera.getCamera();
+					cam.setMode(240, 180, 24);
+					cam.setQuality(0, 90);
+					vid = new Video(cam.width, cam.height);
+					vid.attachCamera(cam);
+//					record_btn.label = 'recording';
+					ns.attachCamera(cam);
+					ns.publish('test', 'record');
+				}
+			}
+			
+			private function play():void
+			{
+				trace('play');
+				vid.attachNetStream(ns);
+				if (stream_txt.text != "") {
+					ns.play(stream_txt.text);
+				}
+			}
+			private function stopPlay():void
+			{
+				trace('play');
+				vid.attachNetStream(ns);
+				ns.play(false);
+				ns.close();
+			}
+			private function streamHandler(e:NetStatusEvent):void
+			{
+				trace('streamHandler code:',e.info.code);
+			}
+			private function vpCompleteHandler(e:TimeEvent):void
+			{	
+				trace('vpCompleteHandler');
+				for( var p:String in e)
+				{
+					trace(p, e[p]);
+				}
+			}
+			private function vpMediaPlayerStateChangeHandler(e:MediaPlayerStateChangeEvent):void
+			{
+				trace('vpMediaPlayerStateChangeHandler', e.state);
+				
+				test_txt.text = e.state;
+			}
+
+			private function testSo() : void {
+				nc_testso = new NetConnection();
+				nc.connect(rtmpsrc_so);
+			}
+						
+		]]>
+	</fx:Script>
+	<s:VGroup x="10" y="10">
+		<s:HGroup>
+			<s:VGroup>
+				<s:Label text="connect"/>
+				<s:TextInput id="connect_txt" width="200">rtmp://fms.2be.com.tw/basicSO</s:TextInput>
+			</s:VGroup>
+			<s:TextArea id="test_txt" x="200" y="10" height="100" />	
+		</s:HGroup>
+		<s:Label  text="stream"/>
+		<s:TextInput id="stream_txt">cameraFeed</s:TextInput>
+		<s:Button label="play" click="play()" />
+		<s:Button label="stop" click="stopPlay()" />
+		<s:VideoPlayer
+			id="player"
+			loop="true"
+			complete="vpCompleteHandler(event);"
+			mediaPlayerStateChange="vpMediaPlayerStateChangeHandler(event);"> 
+			<s:DynamicStreamingVideoSource host="rtmp://fms.2be.com.tw/live" streamType="live"> 
+	        	<s:DynamicStreamingVideoItem streamName="{stream_txt.text}" /> 
+	    	</s:DynamicStreamingVideoSource>
+	    </s:VideoPlayer>
+	</s:VGroup>
+</s:Application>
